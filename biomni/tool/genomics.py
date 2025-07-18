@@ -17,6 +17,8 @@ def annotate_celltype_scRNA(
     cluster="leiden",
     llm="claude-3-5-sonnet-20241022",
     composition=None,
+    base_url: str | None = None,
+    api_key: str = "EMPTY",
 ):
     """Annotate cell types based on gene markers and transferred labels using LLM.
     After leiden clustering, annotate clusters using differentially expressed genes
@@ -30,6 +32,8 @@ def annotate_celltype_scRNA(
     - data_lake_path (str): Path to the data lake
     - llm (str): Language model instance for cell type prediction, such as 'claude-3-haiku-20240307'
     - composition (pd.DataFrame, optional): Transferred cell type composition for each cluster
+    - base_url (str, optional): Base URL for custom model serving
+    - api_key (str): API key for the custom LLM
     Returns:
     - str: Steps performed and file paths where results were saved
 
@@ -89,7 +93,7 @@ No numbers before name or spaces before number.
 """
     # Some can be a mixture of multiple cell types.
 
-    llm = get_llm(llm)
+    llm = get_llm(llm, base_url=base_url, api_key=api_key)
     prompt = PromptTemplate(input_variables=["cluster_info"], template=prompt_template)
     chain = prompt | llm
 

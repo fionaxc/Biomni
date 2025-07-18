@@ -99,6 +99,8 @@ class A1:
         module2api = read_module2api()
 
         self.llm = get_llm(llm, stop_sequences=["</execute>", "</solution>"], base_url=base_url, api_key=api_key)
+        self.base_url = base_url
+        self.api_key = api_key
         self.module2api = module2api
         self.use_tool_retriever = use_tool_retriever
 
@@ -124,7 +126,7 @@ class A1:
             function_name = api.__name__ if hasattr(api, "__name__") else str(api)
 
             # Generate API schema using the existing utility function
-            schema = function_to_api_schema(function_code, self.llm)
+            schema = function_to_api_schema(function_code, self.llm, base_url=getattr(self, 'base_url', None), api_key=getattr(self, 'api_key', 'EMPTY'))
 
             # Ensure the schema has all required fields for the tool registry
             if not isinstance(schema, dict):

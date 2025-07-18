@@ -76,6 +76,32 @@ agent = A1(path='./data', llm='claude-sonnet-4-20250514')
 agent.go("Plan a CRISPR screen to identify genes that regulate T cell exhaustion, generate 32 genes that maximize the perturbation effect.")
 agent.go("Perform scRNA-seq annotation at [PATH] and generate meaningful hypothesis")
 agent.go("Predict ADMET properties for this compound: CC(C)CC1=CC=C(C=C1)C(C)C(=O)O")
+
+### Using Custom/Secure API Endpoints
+
+Biomni supports custom API endpoints that follow the OpenAI API format. This is useful for secure or private deployments:
+
+```python
+from biomni.agent import A1
+
+# Your secure API configuration
+gpt4o_url = "https://apim.stanfordhealthcare.org/openai24/deployments/gpt-4o/chat/completions?api-version=2023-05-15"
+gpt4o_modelid = "gpt-4o"
+api_key = "your_api_key_here"
+
+# Initialize agent with custom API
+agent = A1(
+    path='./data', 
+    llm=gpt4o_modelid,
+    base_url=gpt4o_url,
+    api_key=api_key
+)
+
+# Use the agent normally
+agent.go("Your biomedical task here")
+```
+
+See [Secure API Example](./tutorials/secure_api_example.ipynb) for more details.
 ```
 
 ## 🤝 Contributing to Biomni

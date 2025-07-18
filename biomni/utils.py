@@ -246,7 +246,7 @@ class api_schema(BaseModel):
     api_schema: str | None = Field(description="The api schema as a dictionary")
 
 
-def function_to_api_schema(function_string, llm):
+def function_to_api_schema(function_string, llm, base_url: str | None = None, api_key: str = "EMPTY"):
     prompt = """
     Based on a code snippet and help me write an API docstring in the format like this:
 
@@ -272,6 +272,11 @@ def function_to_api_schema(function_string, llm):
     Here is the code snippet:
     {code}
     """
+    # If llm is a string, convert it to an LLM instance
+    if isinstance(llm, str):
+        from biomni.llm import get_llm
+        llm = get_llm(llm, base_url=base_url, api_key=api_key)
+    
     llm = llm.with_structured_output(api_schema)
 
     for _ in range(7):

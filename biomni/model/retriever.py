@@ -68,7 +68,8 @@ IMPORTANT GUIDELINES:
 
         # Use the provided LLM or create a new one
         if llm is None:
-            llm = ChatOpenAI(model="gpt-4o")
+            from biomni.llm import get_llm
+            llm = get_llm("gpt-4o")
 
         # Invoke the LLM
         if hasattr(llm, "invoke"):

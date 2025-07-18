@@ -41,6 +41,8 @@ class react:
         llm="claude-3-7-sonnet-latest",
         use_tool_retriever=False,
         timeout_seconds=600,
+        base_url: str | None = None,
+        api_key: str = "EMPTY",
     ):
         self.path = path
         if not os.path.exists(path):
@@ -52,7 +54,9 @@ class react:
 
         module2api = read_module2api()
 
-        self.llm = get_llm(llm)
+        self.llm = get_llm(llm, base_url=base_url, api_key=api_key)
+        self.base_url = base_url
+        self.api_key = api_key
         tools = []
         for module, api_list in module2api.items():
             print("Registering tools from module:", module)
@@ -140,7 +144,7 @@ class react:
 
     def add_tool(self, api):
         function_code = inspect.getsource(api)
-        schema = function_to_api_schema(function_code, self.llm)
+        schema = function_to_api_schema(function_code, self.llm, base_url=self.base_url, api_key=self.api_key)
         new_tool = api_schema_to_langchain_tool(schema, mode="custom_tool", module_name=api.__module__)
 
         # Create a single wrapped tool using the existing _add_timeout_to_tools method

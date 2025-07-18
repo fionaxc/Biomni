@@ -90,10 +90,21 @@ def get_llm(
             region_name=os.getenv("AWS_REGION", "us-east-1"),
         )
     elif source == "Custom":
-        # Custom LLM serving such as SGLang. Must expose an openai compatible API.
+        # Custom LLM serving such as SGLang or secure APIs. Must expose an openai compatible API.
         assert base_url is not None, "base_url must be provided for customly served LLMs"
-        llm = ChatOpenAI(model=model, temperature=temperature, max_tokens=8192, stop_sequences=stop_sequences)
-        llm.client = openai.Client(base_url=base_url, api_key=api_key).chat.completions
+        
+        # Create OpenAI client with custom base URL
+        client = openai.Client(base_url=base_url, api_key=api_key)
+        
+        # Create ChatOpenAI instance with custom client
+        llm = ChatOpenAI(
+            model=model, 
+            temperature=temperature, 
+            max_tokens=8192, 
+            stop_sequences=stop_sequences,
+            openai_api_key=api_key,
+            openai_api_base=base_url
+        )
         return llm
     else:
         raise ValueError(

@@ -4,9 +4,9 @@ from biomni.llm import get_llm
 
 
 class qa_llm:
-    def __init__(self, path="./data", llm="claude-3-haiku-20240307", lab_bench_reproduce=False):
+    def __init__(self, path="./data", llm="claude-3-haiku-20240307", lab_bench_reproduce=False, base_url: str | None = None, api_key: str = "EMPTY"):
         self.path = path
-        self.llm = get_llm(llm)
+        self.llm = get_llm(llm, base_url=base_url, api_key=api_key)
 
         if lab_bench_reproduce:
             self.prompt_modifier = """
