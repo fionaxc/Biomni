@@ -1,21 +1,21 @@
 #!/usr/bin/env python3
 """
-Example: Using Biomni with a Secure API Endpoint
+Example: Using Biomni with a Stanford Secure API Endpoint 
 
-This example demonstrates how to use Biomni with a secure API endpoint
-that follows the OpenAI API format.
 """
 
+import os
 import sys
 sys.path.append("../")
 
 from biomni.agent import A1
+DEFAULT_API_KEY = os.environ.get("OPENAI_API_KEY")
 
 def main():
     # Your secure API configuration
     gpt4o_url = "https://apim.stanfordhealthcare.org/openai24/deployments/gpt-4o/chat/completions?api-version=2023-05-15"
     gpt4o_modelid = "gpt-4o"
-    api_key = "your_api_key_here"  # Replace with your actual API key
+    api_key = DEFAULT_API_KEY
     
     print("Initializing Biomni agent with secure API...")
     
@@ -69,8 +69,8 @@ def main():
 
         Example output:
         [
-        {"gene_name": "SNRPN", "rank": 1, "explanation": "Associated with Prader-Willi syndrome, which matches features like hypotonia, obesity, developmental delay, speech apraxia, and characteristic facial features."},
-        {"gene_name": "MAGEL2", "rank": 2, "explanation": "Also implicated in Prader-Willi-like syndromes with overlapping features, but less common than SNRPN."}
+        {"gene_name": "GENE1", "rank": 1, "explanation": "Explanation here"},
+        {"gene_name": "GENE2", "rank": 2, "explanation": "Explanation here"}
         ]
         """
  
