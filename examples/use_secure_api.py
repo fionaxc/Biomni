@@ -239,9 +239,9 @@ if __name__ == "__main__":
     # Uncomment the example you want to run:
 
     # example_1_env_variables()  # Requires additional env vars
-    example_2_config_object()
+    # example_2_config_object()
     # example_3_compare_models()
-    # example_4_simple_qa()
+    example_4_simple_qa()
 
     print("\n" + "=" * 60)
     print("Examples completed!")

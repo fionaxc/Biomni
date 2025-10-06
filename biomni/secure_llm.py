@@ -385,11 +385,10 @@ class SecureChatModel(BaseChatModel):
                     })
                 inner_payload["tools"] = anthropic_tools
 
-            # For Stanford's Bedrock proxy, wrap the Anthropic format with model_id
-            payload = {
-                "model_id": self.model_id,
-                "body": inner_payload
-            }
+            # For Stanford's Bedrock proxy, send the Anthropic format directly
+            # The API expects the Anthropic Messages API format, not wrapped
+            payload = inner_payload
+            payload["model_id"] = self.model_id
         elif self.model_id in ["Llama-3.3-70B-Instruct", "Llama-4-Maverick-17B-128E-Instruct-FP8", "Llama-4-Scout-17B-16E-Instruct"]:
             # Llama models may support tools
             payload = {
