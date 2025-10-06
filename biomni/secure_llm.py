@@ -144,6 +144,8 @@ class SecureChatModel(BaseChatModel):
 
         if self.bound_tools:
             content, tool_calls = self._extract_content_and_tool_calls(response_json)
+            # Ensure content is never None - use empty string if None
+            content = content if content is not None else ""
             message = AIMessage(content=content, tool_calls=tool_calls)
         else:
             content = self._extract_content(response_json)
@@ -441,7 +443,8 @@ class SecureChatModel(BaseChatModel):
         if "choices" in response_json:
             # OpenAI-style response (GPT, Llama, DeepSeek)
             message = response_json["choices"][0]["message"]
-            content = message.get("content", "")
+            # Handle case where content is explicitly null in the response
+            content = message.get("content") or ""
 
             # Extract tool calls if present
             if "tool_calls" in message and message["tool_calls"]:
