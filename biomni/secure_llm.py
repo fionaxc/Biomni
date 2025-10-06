@@ -7,13 +7,15 @@ including GPT, Claude, and other models accessible through the secure endpoint.
 """
 
 import json
-from typing import Any, Iterator, List, Optional
+from typing import Any, Iterator, List, Optional, Union
 
 import requests
 from langchain_core.callbacks.manager import CallbackManagerForLLMRun
 from langchain_core.language_models.chat_models import BaseChatModel
-from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
+from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage, ToolCall, ToolMessage
 from langchain_core.outputs import ChatGeneration, ChatResult
+from langchain_core.tools import BaseTool
+from langchain_core.utils.function_calling import convert_to_openai_tool
 
 
 class SecureChatModel(BaseChatModel):
@@ -44,11 +46,44 @@ class SecureChatModel(BaseChatModel):
     api_key: str
     temperature: float = 0.7
     max_tokens: int = 8192
+    bound_tools: Optional[List[dict]] = None
 
     @property
     def _llm_type(self) -> str:
         """Return type of chat model."""
         return "secure-chat"
+
+    def bind_tools(
+        self,
+        tools: List[Union[dict, type, BaseTool]],
+        **kwargs: Any,
+    ) -> "SecureChatModel":
+        """Bind tools to the model.
+
+        Args:
+            tools: List of tools to bind (can be dicts, types, or BaseTool objects)
+            **kwargs: Additional keyword arguments
+
+        Returns:
+            A new instance of SecureChatModel with bound tools
+        """
+        # Convert tools to OpenAI format
+        formatted_tools = []
+        for tool in tools:
+            if isinstance(tool, dict):
+                formatted_tools.append(tool)
+            else:
+                formatted_tools.append(convert_to_openai_tool(tool))
+
+        # Create a new instance with bound tools
+        return self.__class__(
+            model_id=self.model_id,
+            api_url=self.api_url,
+            api_key=self.api_key,
+            temperature=self.temperature,
+            max_tokens=self.max_tokens,
+            bound_tools=formatted_tools,
+        )
 
     def _generate(
         self,
@@ -68,11 +103,16 @@ class SecureChatModel(BaseChatModel):
         Returns:
             ChatResult containing the model's response
         """
-        # Convert messages to the appropriate format
-        prompt = self._messages_to_prompt(messages)
-
-        # Build the request payload based on model type
-        payload = self._build_payload(prompt)
+        # Check if we're using tools (requires OpenAI-style format)
+        if self.bound_tools:
+            # Use OpenAI-style message format for tool calling
+            openai_messages = self._messages_to_openai_format(messages)
+            payload = self._build_payload_with_tools(openai_messages)
+        else:
+            # Convert messages to the appropriate format
+            prompt = self._messages_to_prompt(messages)
+            # Build the request payload based on model type
+            payload = self._build_payload(prompt)
 
         # Set up headers
         headers = {
@@ -84,11 +124,16 @@ class SecureChatModel(BaseChatModel):
         response = requests.post(self.api_url, headers=headers, data=json.dumps(payload))
         response.raise_for_status()
 
-        # Extract the response content based on model type
-        content = self._extract_content(response.json())
+        # Extract the response content and tool calls
+        response_json = response.json()
 
-        # Create the chat generation
-        message = AIMessage(content=content)
+        if self.bound_tools:
+            content, tool_calls = self._extract_content_and_tool_calls(response_json)
+            message = AIMessage(content=content, tool_calls=tool_calls)
+        else:
+            content = self._extract_content(response_json)
+            message = AIMessage(content=content)
+
         generation = ChatGeneration(message=message)
 
         return ChatResult(generations=[generation])
@@ -133,7 +178,26 @@ class SecureChatModel(BaseChatModel):
             elif isinstance(msg, HumanMessage):
                 openai_messages.append({"role": "user", "content": msg.content})
             elif isinstance(msg, AIMessage):
-                openai_messages.append({"role": "assistant", "content": msg.content})
+                message_dict = {"role": "assistant", "content": msg.content or ""}
+                # Include tool calls if present
+                if hasattr(msg, "tool_calls") and msg.tool_calls:
+                    message_dict["tool_calls"] = []
+                    for tool_call in msg.tool_calls:
+                        message_dict["tool_calls"].append({
+                            "id": tool_call.get("id", ""),
+                            "type": "function",
+                            "function": {
+                                "name": tool_call["name"],
+                                "arguments": json.dumps(tool_call["args"])
+                            }
+                        })
+                openai_messages.append(message_dict)
+            elif isinstance(msg, ToolMessage):
+                openai_messages.append({
+                    "role": "tool",
+                    "tool_call_id": msg.tool_call_id,
+                    "content": msg.content
+                })
             else:
                 openai_messages.append({"role": "user", "content": str(msg.content)})
 
@@ -216,6 +280,111 @@ class SecureChatModel(BaseChatModel):
         else:
             # Fallback - try to find any text content
             raise ValueError(f"Unable to extract content from response: {response_json}")
+
+    def _build_payload_with_tools(self, messages: List[dict]) -> dict:
+        """Build the API request payload with tools included.
+
+        Args:
+            messages: List of message dictionaries in OpenAI format
+
+        Returns:
+            Dictionary payload for the API request with tools
+        """
+        # Build base payload for models that support tool calling
+        if self.model_id in ["gpt-4o", "gpt-4.1"] or self.model_id.startswith("gpt-"):
+            # OpenAI-style models
+            payload = {
+                "model": self.model_id,
+                "messages": messages,
+                "temperature": self.temperature,
+                "max_tokens": self.max_tokens,
+                "tools": self.bound_tools,
+            }
+        elif self.model_id.startswith("anthropic.claude") or self.model_id.startswith("arn:aws:bedrock"):
+            # Claude models on Bedrock support tools
+            payload = {
+                "model_id": self.model_id,
+                "messages": messages,
+                "tools": self.bound_tools,
+                "temperature": self.temperature,
+                "max_tokens": self.max_tokens,
+            }
+        elif self.model_id in ["Llama-3.3-70B-Instruct", "Llama-4-Maverick-17B-128E-Instruct-FP8", "Llama-4-Scout-17B-16E-Instruct"]:
+            # Llama models may support tools
+            payload = {
+                "model": self.model_id,
+                "messages": messages,
+                "tools": self.bound_tools,
+                "temperature": self.temperature,
+                "max_tokens": self.max_tokens,
+            }
+        elif self.model_id == "deepseek-chat":
+            # DeepSeek models with tools
+            payload = {
+                "model": self.model_id,
+                "messages": messages,
+                "tools": self.bound_tools,
+                "temperature": self.temperature,
+                "max_tokens": self.max_tokens,
+                "top_p": 1,
+                "stream": False
+            }
+        else:
+            # Default to OpenAI-style format with tools
+            payload = {
+                "model": self.model_id,
+                "messages": messages,
+                "tools": self.bound_tools,
+                "temperature": self.temperature,
+                "max_tokens": self.max_tokens
+            }
+
+        return payload
+
+    def _extract_content_and_tool_calls(self, response_json: dict) -> tuple:
+        """Extract content and tool calls from the API response.
+
+        Args:
+            response_json: The JSON response from the API
+
+        Returns:
+            Tuple of (content, tool_calls) where tool_calls is a list of dicts
+        """
+        tool_calls = []
+        content = ""
+
+        # Try different response formats based on model type
+        if "choices" in response_json:
+            # OpenAI-style response (GPT, Llama, DeepSeek)
+            message = response_json["choices"][0]["message"]
+            content = message.get("content", "")
+
+            # Extract tool calls if present
+            if "tool_calls" in message and message["tool_calls"]:
+                for tool_call in message["tool_calls"]:
+                    tool_calls.append({
+                        "name": tool_call["function"]["name"],
+                        "args": json.loads(tool_call["function"]["arguments"]),
+                        "id": tool_call.get("id", ""),
+                    })
+
+        elif "content" in response_json:
+            # Anthropic-style response (Claude)
+            content_list = response_json["content"]
+            if isinstance(content_list, list):
+                for item in content_list:
+                    if item.get("type") == "text":
+                        content += item["text"]
+                    elif item.get("type") == "tool_use":
+                        tool_calls.append({
+                            "name": item["name"],
+                            "args": item["input"],
+                            "id": item.get("id", ""),
+                        })
+            else:
+                content = content_list
+
+        return content, tool_calls
 
     @property
     def _identifying_params(self) -> dict:
