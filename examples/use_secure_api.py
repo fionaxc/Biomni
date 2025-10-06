@@ -104,6 +104,11 @@ def example_2_config_object():
         print("Error: OPENAI_API_KEY environment variable not set")
         return
 
+    # Set environment variables so that database tools can use the secure API
+    os.environ["BIOMNI_SOURCE"] = "SecureAPI"
+    os.environ["BIOMNI_SECURE_API_URL"] = gpt41_url
+    os.environ["BIOMNI_SECURE_MODEL_ID"] = gpt41_modelid
+
     # Create config with secure API settings - using GPT-4.1 which supports tool calling
     config = BiomniConfig(
         path="./data",
