@@ -468,43 +468,43 @@ description = [
             },
         ],
     },
-    {
-        "description": "Create visualization plots for registration results. "
-        "Generates comparison plots, difference images, overlays, and metric charts.",
-        "name": "create_registration_visualization",
-        "optional_parameters": [
-            {
-                "default": "registration",
-                "description": "Prefix for output files",
-                "name": "prefix",
-                "type": "str",
-            },
-        ],
-        "required_parameters": [
-            {
-                "default": None,
-                "description": "Path to the reference (fixed) image file",
-                "name": "fixed_image_path",
-                "type": "str",
-            },
-            {
-                "default": None,
-                "description": "Path to the original moving image file",
-                "name": "moving_image_path",
-                "type": "str",
-            },
-            {
-                "default": None,
-                "description": "Path to the registered image file",
-                "name": "registered_image_path",
-                "type": "str",
-            },
-            {
-                "default": None,
-                "description": "Directory to save visualization files",
-                "name": "output_dir",
-                "type": "str",
-            },
-        ],
-    },
+    # {
+    #     "description": "Create visualization plots for registration results. "
+    #     "Generates comparison plots, difference images, overlays, and metric charts.",
+    #     "name": "create_registration_visualization",
+    #     "optional_parameters": [
+    #         {
+    #             "default": "registration",
+    #             "description": "Prefix for output files",
+    #             "name": "prefix",
+    #             "type": "str",
+    #         },
+    #     ],
+    #     "required_parameters": [
+    #         {
+    #             "default": None,
+    #             "description": "Path to the reference (fixed) image file",
+    #             "name": "fixed_image_path",
+    #             "type": "str",
+    #         },
+    #         {
+    #             "default": None,
+    #             "description": "Path to the original moving image file",
+    #             "name": "moving_image_path",
+    #             "type": "str",
+    #         },
+    #         {
+    #             "default": None,
+    #             "description": "Path to the registered image file",
+    #             "name": "registered_image_path",
+    #             "type": "str",
+    #         },
+    #         {
+    #             "default": None,
+    #             "description": "Directory to save visualization files",
+    #             "name": "output_dir",
+    #             "type": "str",
+    #         },
+    #     ],
+    # },
 ]
