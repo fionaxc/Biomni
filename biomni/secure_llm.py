@@ -282,6 +282,10 @@ class SecureChatModel(BaseChatModel):
         Returns:
             The text content from the response
         """
+        # Unwrap Bedrock response if needed
+        if "body" in response_json and isinstance(response_json["body"], dict):
+            response_json = response_json["body"]
+
         # Try different response formats based on model type
         if "choices" in response_json:
             # OpenAI-style response (GPT, Llama, DeepSeek)
@@ -381,9 +385,11 @@ class SecureChatModel(BaseChatModel):
                     })
                 inner_payload["tools"] = anthropic_tools
 
-            # For Stanford's Bedrock proxy, send the Anthropic format directly
-            # The model_id is already in the URL or handled by the gateway
-            payload = inner_payload
+            # For Stanford's Bedrock proxy, wrap the Anthropic format with model_id
+            payload = {
+                "model_id": self.model_id,
+                "body": inner_payload
+            }
         elif self.model_id in ["Llama-3.3-70B-Instruct", "Llama-4-Maverick-17B-128E-Instruct-FP8", "Llama-4-Scout-17B-16E-Instruct"]:
             # Llama models may support tools
             payload = {
@@ -427,6 +433,10 @@ class SecureChatModel(BaseChatModel):
         """
         tool_calls = []
         content = ""
+
+        # Unwrap Bedrock response if needed
+        if "body" in response_json and isinstance(response_json["body"], dict):
+            response_json = response_json["body"]
 
         # Try different response formats based on model type
         if "choices" in response_json:
