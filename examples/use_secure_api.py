@@ -104,12 +104,12 @@ def example_2_config_object():
         print("Error: OPENAI_API_KEY environment variable not set")
         return
 
-    # Create config with secure API settings
+    # Create config with secure API settings - using GPT-4.1 which supports tool calling
     config = BiomniConfig(
         path="./data",
         source="SecureAPI",
-        secure_api_url=claude35_url,
-        secure_model_id=claude35_modelid,
+        secure_api_url=gpt41_url,
+        secure_model_id=gpt41_modelid,
         api_key=api_key,
         temperature=0.7,
     )
@@ -239,9 +239,9 @@ if __name__ == "__main__":
     # Uncomment the example you want to run:
 
     # example_1_env_variables()  # Requires additional env vars
-    # example_2_config_object()
+    example_2_config_object()
     # example_3_compare_models()
-    example_4_simple_qa()
+    # example_4_simple_qa()
 
     print("\n" + "=" * 60)
     print("Examples completed!")
