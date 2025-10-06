@@ -301,37 +301,70 @@ class SecureChatModel(BaseChatModel):
                 "tools": self.bound_tools,
             }
         elif self.model_id.startswith("anthropic.claude") or self.model_id.startswith("arn:aws:bedrock"):
-            # Claude models on Bedrock - the secure API doesn't support tool calling format
-            # Convert messages back to prompt_text format
-            prompt_parts = []
+            # Claude models on Bedrock - convert to Anthropic Messages API format with tools
+            anthropic_messages = []
+            system_content = None
+
             for msg in messages:
                 role = msg.get("role", "user")
                 content = msg.get("content", "")
 
                 if role == "system":
-                    prompt_parts.append(f"System: {content}")
+                    system_content = content
                 elif role == "user":
-                    prompt_parts.append(f"Human: {content}")
+                    anthropic_messages.append({"role": "user", "content": content})
                 elif role == "assistant":
-                    prompt_parts.append(f"Assistant: {content}")
+                    message_dict = {"role": "assistant", "content": content or ""}
+                    # Include tool calls if present
+                    if "tool_calls" in msg and msg["tool_calls"]:
+                        # Convert OpenAI format tool calls to Anthropic format
+                        content_blocks = []
+                        if content:
+                            content_blocks.append({"type": "text", "text": content})
+                        for tool_call in msg["tool_calls"]:
+                            content_blocks.append({
+                                "type": "tool_use",
+                                "id": tool_call.get("id", ""),
+                                "name": tool_call["function"]["name"],
+                                "input": json.loads(tool_call["function"]["arguments"])
+                            })
+                        message_dict["content"] = content_blocks
+                    anthropic_messages.append(message_dict)
                 elif role == "tool":
-                    prompt_parts.append(f"Tool result: {content}")
+                    # Tool results in Anthropic format
+                    anthropic_messages.append({
+                        "role": "user",
+                        "content": [{
+                            "type": "tool_result",
+                            "tool_use_id": msg.get("tool_call_id", ""),
+                            "content": content
+                        }]
+                    })
 
-            prompt_text = "\n\n".join(prompt_parts)
-
-            # Add tool descriptions to the prompt
-            if self.bound_tools:
-                tool_descriptions = "\n\nAvailable tools:\n"
-                for tool in self.bound_tools:
-                    tool_name = tool.get("function", {}).get("name", "unknown")
-                    tool_desc = tool.get("function", {}).get("description", "")
-                    tool_descriptions += f"- {tool_name}: {tool_desc}\n"
-                prompt_text += tool_descriptions
-
+            # Build payload with Anthropic Messages API format
             payload = {
                 "model_id": self.model_id,
-                "prompt_text": prompt_text
+                "anthropic_version": "bedrock-2023-05-31",
+                "messages": anthropic_messages,
+                "max_tokens": self.max_tokens,
+                "temperature": self.temperature
             }
+
+            # Add system message if present
+            if system_content:
+                payload["system"] = system_content
+
+            # Add tools if present (convert to Anthropic format)
+            if self.bound_tools:
+                anthropic_tools = []
+                for tool in self.bound_tools:
+                    func = tool.get("function", {})
+                    anthropic_tools.append({
+                        "name": func.get("name", ""),
+                        "description": func.get("description", ""),
+                        "input_schema": func.get("parameters", {})
+                    })
+                payload["tools"] = anthropic_tools
         elif self.model_id in ["Llama-3.3-70B-Instruct", "Llama-4-Maverick-17B-128E-Instruct-FP8", "Llama-4-Scout-17B-16E-Instruct"]:
             # Llama models may support tools
             payload = {
@@ -397,11 +430,11 @@ class SecureChatModel(BaseChatModel):
             if isinstance(content_list, list):
                 for item in content_list:
                     if item.get("type") == "text":
-                        content += item["text"]
+                        content += item.get("text", "")
                     elif item.get("type") == "tool_use":
                         tool_calls.append({
-                            "name": item["name"],
-                            "args": item["input"],
+                            "name": item.get("name", ""),
+                            "args": item.get("input", {}),
                             "id": item.get("id", ""),
                         })
             else:
