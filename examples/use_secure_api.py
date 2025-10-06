@@ -76,7 +76,8 @@ def example_1_env_variables():
         path=config.path,
         llm=config.llm,
         use_tool_retriever=config.use_tool_retriever,
-        timeout_seconds=config.timeout_seconds
+        timeout_seconds=config.timeout_seconds,
+        config=config
     )
 
     # Use the agent
@@ -118,7 +119,8 @@ def example_2_config_object():
         path=config.path,
         llm=config.llm,
         use_tool_retriever=config.use_tool_retriever,
-        timeout_seconds=config.timeout_seconds
+        timeout_seconds=config.timeout_seconds,
+        config=config
     )
 
     # Use the agent
@@ -171,7 +173,8 @@ def example_3_compare_models():
             path=config.path,
             llm=config.llm,
             use_tool_retriever=config.use_tool_retriever,
-            timeout_seconds=config.timeout_seconds
+            timeout_seconds=config.timeout_seconds,
+            config=config
         )
 
         # Get answer
@@ -210,7 +213,7 @@ def example_4_simple_qa():
     )
 
     # Create a simple Q&A agent
-    agent = qa_llm(path=config.path, llm=config.llm)
+    agent = qa_llm(path=config.path, llm=config.llm, config=config)
 
     # Use the agent
     question = "What is the central dogma of molecular biology?"

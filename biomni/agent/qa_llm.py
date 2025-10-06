@@ -1,12 +1,17 @@
+from typing import TYPE_CHECKING
+
 from langchain_core.prompts import ChatPromptTemplate
 
 from biomni.llm import get_llm
 
+if TYPE_CHECKING:
+    from biomni.config import BiomniConfig
+
 
 class qa_llm:
-    def __init__(self, path="./data", llm="claude-3-haiku-20240307", lab_bench_reproduce=False):
+    def __init__(self, path="./data", llm="claude-3-haiku-20240307", lab_bench_reproduce=False, config: "BiomniConfig | None" = None):
         self.path = path
-        self.llm = get_llm(llm)
+        self.llm = get_llm(llm, config=config)
 
         if lab_bench_reproduce:
             self.prompt_modifier = """

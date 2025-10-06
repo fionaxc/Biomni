@@ -1,12 +1,16 @@
 import re
+from typing import TYPE_CHECKING
 
 from biomni.llm import get_llm
 
+if TYPE_CHECKING:
+    from biomni.config import BiomniConfig
+
 
 class base_agent:
-    def __init__(self, llm="claude-3-haiku-20240307", cheap_llm=None, tools=None, temperature=0.7):
+    def __init__(self, llm="claude-3-haiku-20240307", cheap_llm=None, tools=None, temperature=0.7, config: "BiomniConfig | None" = None):
         self.tools = tools
-        self.llm = get_llm(llm, temperature)
+        self.llm = get_llm(llm, temperature=temperature, config=config)
         if cheap_llm is None:
             self.cheap_llm = llm
         else:
@@ -22,14 +26,15 @@ class base_agent:
 class FunctionGenerator(base_agent):
     """Agent that generates executable Python code scripts given a task description."""
 
-    def __init__(self, llm="claude-3-7-sonnet-20250219", cheap_llm=None, temperature=0.7):
+    def __init__(self, llm="claude-3-7-sonnet-20250219", cheap_llm=None, temperature=0.7, config: "BiomniConfig | None" = None):
         """Initialize the PaperTaskExtractor agent.
 
         Args:
             llm (str): The LLM model to use
             cheap_llm (str, optional): A cheaper LLM for simpler tasks
+            config (BiomniConfig, optional): Configuration object for LLM initialization
         """
-        super().__init__(llm, cheap_llm, temperature)
+        super().__init__(llm, cheap_llm, temperature=temperature, config=config)
         self.log = []
         self.configure()
 

@@ -64,6 +64,7 @@ class A1:
         api_key: str | None = None,
         commercial_mode: bool | None = None,
         expected_data_lake_files: list | None = None,
+        config: "BiomniConfig | None" = None,
     ):
         """Initialize the biomni agent.
 
@@ -76,25 +77,30 @@ class A1:
             base_url: Base URL for custom model serving (e.g., "http://localhost:8000/v1")
             api_key: API key for the custom LLM
             commercial_mode: If True, excludes datasets that require commercial licenses or are non-commercial only
+            config: Configuration object. If provided, unspecified parameters will use config values
 
         """
-        # Use default_config values for unspecified parameters
+        # Use provided config or default_config
+        if config is None:
+            config = default_config
+
+        # Use config values for unspecified parameters
         if path is None:
-            path = default_config.path
+            path = config.path
         if llm is None:
-            llm = default_config.llm
+            llm = config.llm
         if source is None:
-            source = default_config.source
+            source = config.source
         if use_tool_retriever is None:
-            use_tool_retriever = default_config.use_tool_retriever
+            use_tool_retriever = config.use_tool_retriever
         if timeout_seconds is None:
-            timeout_seconds = default_config.timeout_seconds
+            timeout_seconds = config.timeout_seconds
         if base_url is None:
-            base_url = default_config.base_url
+            base_url = config.base_url
         if api_key is None:
-            api_key = default_config.api_key if default_config.api_key else "EMPTY"
+            api_key = config.api_key if config.api_key else "EMPTY"
         if commercial_mode is None:
-            commercial_mode = default_config.commercial_mode
+            commercial_mode = config.commercial_mode
 
         # Import appropriate env_desc based on commercial_mode
         if commercial_mode:
@@ -117,12 +123,12 @@ class A1:
         print("=" * 50)
 
         # Get the actual LLM values that will be used by the agent
-        agent_llm = llm if llm is not None else default_config.llm
-        agent_source = source if source is not None else default_config.source
+        agent_llm = llm if llm is not None else config.llm
+        agent_source = source if source is not None else config.source
 
         # Show default config (database LLM)
         print("📋 DEFAULT CONFIG (Including Database LLM):")
-        config_dict = default_config.to_dict()
+        config_dict = config.to_dict()
         for key, value in config_dict.items():
             if value is not None:
                 # Special formatting for commercial_mode
@@ -133,7 +139,7 @@ class A1:
                     print(f"  {key.replace('_', ' ').title()}: {value}")
 
         # Show agent-specific LLM if different from default
-        if agent_llm != default_config.llm or agent_source != default_config.source:
+        if agent_llm != config.llm or agent_source != config.source:
             print("\n🤖 AGENT LLM (Constructor Override):")
             print(f"  LLM Model: {agent_llm}")
             if agent_source is not None:
@@ -196,7 +202,7 @@ class A1:
             source=source,
             base_url=base_url,
             api_key=api_key,
-            config=default_config,
+            config=config,
         )
         self.module2api = module2api
         self.use_tool_retriever = use_tool_retriever

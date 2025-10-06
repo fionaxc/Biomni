@@ -42,16 +42,21 @@ class react:
         llm: str | None = None,
         use_tool_retriever: bool | None = None,
         timeout_seconds: int | None = None,
+        config: "BiomniConfig | None" = None,
     ):
-        # Use default_config values for unspecified parameters
+        # Use provided config or default_config
+        if config is None:
+            config = default_config
+
+        # Use config values for unspecified parameters
         if path is None:
-            path = default_config.path
+            path = config.path
         if llm is None:
-            llm = default_config.llm
+            llm = config.llm
         if use_tool_retriever is None:
-            use_tool_retriever = default_config.use_tool_retriever
+            use_tool_retriever = config.use_tool_retriever
         if timeout_seconds is None:
-            timeout_seconds = default_config.timeout_seconds
+            timeout_seconds = config.timeout_seconds
 
         self.path = path
         if not os.path.exists(path):
@@ -63,7 +68,7 @@ class react:
 
         module2api = read_module2api()
 
-        self.llm = get_llm(llm, config=default_config)
+        self.llm = get_llm(llm, config=config)
         tools = []
         for module, api_list in module2api.items():
             print("Registering tools from module:", module)
