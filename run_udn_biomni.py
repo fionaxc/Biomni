@@ -27,6 +27,8 @@ Examples:
 import os
 import json
 import argparse
+import re
+import csv
 from datetime import datetime
 from tqdm import tqdm
 from pathlib import Path
@@ -111,24 +113,78 @@ def create_biomni_agent(model_name: str, api_key: str, data_path: str = DEFAULT_
     return agent
 
 
+def parse_genes_from_response(response: str):
+    """Parse ranked genes from JSONL response."""
+    genes = []
+    if not response:
+        return genes
+
+    for line in response.strip().split('\n'):
+        try:
+            gene_data = json.loads(line)
+            genes.append({
+                "gene_name": gene_data.get("gene_name", ""),
+                "rank": gene_data.get("rank", -1),
+                "explanation": gene_data.get("explanation", "")
+            })
+        except json.JSONDecodeError:
+            continue
+
+    # Sort by rank
+    genes.sort(key=lambda x: x.get("rank", 999))
+    return genes
+
+
+def extract_true_causal_gene(prompt: str):
+    """Extract the true causal gene from the prompt."""
+    # Look for pattern like "True causal gene: GENE_NAME" or similar
+    match = re.search(r'(?:true|actual|causal)\s+(?:causal\s+)?gene[:\s]+([A-Z0-9]+)', prompt, re.IGNORECASE)
+    if match:
+        return match.group(1)
+    return None
+
+
 def run_prompts(prompts, agent, output_file: str, model_name: str):
     """Run all prompts through the agent and save results."""
     results = []
     errors = []
+    csv_rows = []
+
+    # Create output directory structure
+    output_dir = Path(output_file).parent
+    traces_dir = output_dir / "traces"
+    traces_dir.mkdir(parents=True, exist_ok=True)
+
+    csv_file = output_dir / f"results_{model_name}_summary.csv"
 
     print(f"\nRunning {len(prompts)} prompts with model: {model_name}")
-    print(f"Results will be saved to: {output_file}")
+    print(f"JSONL results: {output_file}")
+    print(f"Traces directory: {traces_dir}")
+    print(f"CSV summary: {csv_file}")
     print("=" * 80)
 
     for i, prompt_data in enumerate(tqdm(prompts, desc="Processing prompts")):
         patient_id = prompt_data["patient_id"]
         prompt = prompt_data["prompt"]
+        true_gene = prompt_data.get("true_causal_gene") or extract_true_causal_gene(prompt)
 
         try:
             # Run the prompt through the agent
             trace, answer = agent.go(prompt)
 
-            # Save result
+            # Parse genes from response
+            parsed_genes = parse_genes_from_response(answer)
+            top_gene = parsed_genes[0]["gene_name"] if parsed_genes else None
+
+            # Find rank of true causal gene
+            rank_of_true = None
+            if true_gene:
+                for gene in parsed_genes:
+                    if gene["gene_name"].upper() == true_gene.upper():
+                        rank_of_true = gene["rank"]
+                        break
+
+            # Save result to JSONL
             result = {
                 "patient_id": patient_id,
                 "model": model_name,
@@ -136,13 +192,40 @@ def run_prompts(prompts, agent, output_file: str, model_name: str):
                 "prompt": prompt,
                 "response": answer,
                 "trace_length": len(trace) if trace else 0,
+                "parsed_genes": parsed_genes,
+                "true_causal_gene": true_gene,
+                "top_ranked_gene": top_gene,
+                "rank_of_true_gene": rank_of_true,
                 "success": True
             }
             results.append(result)
 
-            # Write result immediately (in case of interruption)
+            # Write JSONL result immediately (in case of interruption)
             with open(output_file, "a") as f:
                 f.write(json.dumps(result) + "\n")
+
+            # Save trace to individual txt file
+            trace_file = traces_dir / f"{patient_id}_trace.txt"
+            with open(trace_file, "w") as f:
+                f.write(f"Patient ID: {patient_id}\n")
+                f.write(f"Model: {model_name}\n")
+                f.write(f"Timestamp: {datetime.now().isoformat()}\n")
+                f.write("=" * 80 + "\n\n")
+                if trace:
+                    for step_num, step in enumerate(trace, 1):
+                        f.write(f"STEP {step_num}:\n")
+                        f.write(str(step) + "\n")
+                        f.write("-" * 80 + "\n")
+                else:
+                    f.write("No trace available\n")
+
+            # Add to CSV data
+            csv_rows.append({
+                "patient_id": patient_id,
+                "top_ranked_gene": top_gene or "",
+                "true_causal_gene": true_gene or "",
+                "rank_of_true_gene": rank_of_true if rank_of_true is not None else ""
+            })
 
         except Exception as e:
             error_msg = f"Error processing patient {patient_id}: {str(e)}"
@@ -152,7 +235,7 @@ def run_prompts(prompts, agent, output_file: str, model_name: str):
                 "error": str(e)
             })
 
-            # Save error result
+            # Save error result to JSONL
             result = {
                 "patient_id": patient_id,
                 "model": model_name,
@@ -164,6 +247,21 @@ def run_prompts(prompts, agent, output_file: str, model_name: str):
             }
             with open(output_file, "a") as f:
                 f.write(json.dumps(result) + "\n")
+
+            # Add error to CSV
+            csv_rows.append({
+                "patient_id": patient_id,
+                "top_ranked_gene": "ERROR",
+                "true_causal_gene": true_gene or "",
+                "rank_of_true_gene": "ERROR"
+            })
+
+    # Write CSV summary
+    with open(csv_file, "w", newline="") as f:
+        fieldnames = ["patient_id", "top_ranked_gene", "true_causal_gene", "rank_of_true_gene"]
+        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(csv_rows)
 
     # Print summary
     print("\n" + "=" * 80)
@@ -202,9 +300,9 @@ Available models: """ + ", ".join(MODEL_CONFIGS.keys())
     parser.add_argument(
         "--model",
         type=str,
-        default="claude37",
+        default="gpt41",
         choices=list(MODEL_CONFIGS.keys()),
-        help="Model to use (default: claude37)"
+        help="Model to use (default: gpt41)"
     )
     parser.add_argument(
         "--prompts-file",
