@@ -124,7 +124,31 @@ def example_2_config_object():
     )
 
     # Use the agent
-    question = "You are an expert in rare disease diagnosis. I will provide a list of Human Phenotype Ontology (HPO) terms describing a patient's symptoms, \n    along with a list of candidate genes. Using your knowledge of genetics, known disease-gene associations, and variant interpretation, \n    generate a ranked list of all of the candidate genes based on their likelihood of causing the patient's symptoms. \n    Only output a valid jsonl file with no spaces between each json. Rank every candidate gene according to its association with the HPO terms, \n    known gene-disease relationships, and functional impact. Make sure to rank all candidate genes in the list.\n\n    The output must be in JSON Lines (jsonl) format with NO markdown formatting. Each line must be a valid JSON object containing exactly these fields:\n    - gene_name: string\n    - rank: number\n    - explanation: string\n\n    Example format:\n    {\"gene_name\":\"GENE1\",\"rank\":1,\"explanation\":\"Explanation here\"}\n    {\"gene_name\":\"GENE2\",\"rank\":2,\"explanation\":\"Explanation here\"}\n\n    Do not include any other text, markdown formatting, or code block markers in your response. Only output the JSON lines.\n\n    Patient HPO terms:\n    [Male hypogonadism, Azoospermia, Increased circulating gonadotropin level, Obesity, Increased body weight, Primary testicular failure, Decreased testicular size, Sex reversal, Decreased serum testosterone level]\n\n    Candidate genes to rank:\n    [BNC2, LHCGR, AKR1C4, NR5A1, RSPO1]\n}    "
+    question = """You are an expert in rare disease diagnosis.
+
+    IMPORTANT: First, use the available database tools to research each candidate gene and their associations with the provided HPO terms.
+    Query databases like ClinVar, OpenTargets, OMIM, Ensembl, and genetic variant databases to gather evidence about disease-gene associations.
+    Research each gene thoroughly before ranking.
+
+    After completing your research, generate a ranked list of all candidate genes based on their likelihood of causing the patient's symptoms.
+
+    Patient HPO terms:
+    [Male hypogonadism, Azoospermia, Increased circulating gonadotropin level, Obesity, Increased body weight, Primary testicular failure, Decreased testicular size, Sex reversal, Decreased serum testosterone level]
+
+    Candidate genes to rank:
+    [BNC2, LHCGR, AKR1C4, NR5A1, RSPO1]
+
+    The output must be in JSON Lines (jsonl) format with NO markdown formatting. Each line must be a valid JSON object containing exactly these fields:
+    - gene_name: string
+    - rank: number
+    - explanation: string
+
+    Example format:
+    {"gene_name":"GENE1","rank":1,"explanation":"Explanation here"}
+    {"gene_name":"GENE2","rank":2,"explanation":"Explanation here"}
+
+    Do not include any other text, markdown formatting, or code block markers in your response. Only output the JSON lines.
+    """
     trace, answer = agent.go(question)
 
     print(f"\nQuestion: {question}")
