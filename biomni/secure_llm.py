@@ -120,8 +120,23 @@ class SecureChatModel(BaseChatModel):
             "Content-Type": "application/json"
         }
 
+        # Debug logging
+        print(f"\n=== DEBUG: API Request ===")
+        print(f"URL: {self.api_url}")
+        print(f"Model ID: {self.model_id}")
+        print(f"Payload: {json.dumps(payload, indent=2)}")
+        print("=" * 50)
+
         # Make the API request
         response = requests.post(self.api_url, headers=headers, data=json.dumps(payload))
+
+        # Debug logging for response
+        print(f"\n=== DEBUG: API Response ===")
+        print(f"Status Code: {response.status_code}")
+        if response.status_code != 200:
+            print(f"Response Text: {response.text}")
+        print("=" * 50)
+
         response.raise_for_status()
 
         # Extract the response content and tool calls
@@ -342,8 +357,8 @@ class SecureChatModel(BaseChatModel):
                     })
 
             # Build payload with Anthropic Messages API format
-            payload = {
-                "model_id": self.model_id,
+            # The Stanford API gateway wraps Bedrock calls
+            inner_payload = {
                 "anthropic_version": "bedrock-2023-05-31",
                 "messages": anthropic_messages,
                 "max_tokens": self.max_tokens,
@@ -352,7 +367,7 @@ class SecureChatModel(BaseChatModel):
 
             # Add system message if present
             if system_content:
-                payload["system"] = system_content
+                inner_payload["system"] = system_content
 
             # Add tools if present (convert to Anthropic format)
             if self.bound_tools:
@@ -364,7 +379,11 @@ class SecureChatModel(BaseChatModel):
                         "description": func.get("description", ""),
                         "input_schema": func.get("parameters", {})
                     })
-                payload["tools"] = anthropic_tools
+                inner_payload["tools"] = anthropic_tools
+
+            # For Stanford's Bedrock proxy, send the Anthropic format directly
+            # The model_id is already in the URL or handled by the gateway
+            payload = inner_payload
         elif self.model_id in ["Llama-3.3-70B-Instruct", "Llama-4-Maverick-17B-128E-Instruct-FP8", "Llama-4-Scout-17B-16E-Instruct"]:
             # Llama models may support tools
             payload = {
