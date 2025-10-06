@@ -49,6 +49,10 @@ class BiomniConfig:
     # LLM source (auto-detected if None)
     source: str | None = None
 
+    # Secure API settings (for Stanford Healthcare secure API gateway)
+    secure_api_url: str | None = None  # URL for secure API endpoint
+    secure_model_id: str | None = None  # Model ID for secure API (e.g., claude35_modelid)
+
     def __post_init__(self):
         """Load any environment variable overrides if they exist."""
         # Check for environment variable overrides (optional)
@@ -71,6 +75,10 @@ class BiomniConfig:
             self.api_key = os.getenv("BIOMNI_CUSTOM_API_KEY")
         if os.getenv("BIOMNI_SOURCE"):
             self.source = os.getenv("BIOMNI_SOURCE")
+        if os.getenv("BIOMNI_SECURE_API_URL"):
+            self.secure_api_url = os.getenv("BIOMNI_SECURE_API_URL")
+        if os.getenv("BIOMNI_SECURE_MODEL_ID"):
+            self.secure_model_id = os.getenv("BIOMNI_SECURE_MODEL_ID")
 
     def to_dict(self) -> dict:
         """Convert config to dictionary for easy access."""
@@ -84,6 +92,8 @@ class BiomniConfig:
             "base_url": self.base_url,
             "api_key": self.api_key,
             "source": self.source,
+            "secure_api_url": self.secure_api_url,
+            "secure_model_id": self.secure_model_id,
         }
 
 

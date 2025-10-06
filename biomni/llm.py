@@ -6,7 +6,7 @@ from langchain_core.language_models.chat_models import BaseChatModel
 if TYPE_CHECKING:
     from biomni.config import BiomniConfig
 
-SourceType = Literal["OpenAI", "AzureOpenAI", "Anthropic", "Ollama", "Gemini", "Bedrock", "Groq", "Custom"]
+SourceType = Literal["OpenAI", "AzureOpenAI", "Anthropic", "Ollama", "Gemini", "Bedrock", "Groq", "Custom", "SecureAPI"]
 ALLOWED_SOURCES: set[str] = set(SourceType.__args__)
 
 
@@ -18,24 +18,28 @@ def get_llm(
     base_url: str | None = None,
     api_key: str | None = None,
     config: Optional["BiomniConfig"] = None,
+    secure_api_url: str | None = None,
+    secure_model_id: str | None = None,
 ) -> BaseChatModel:
     """
     Get a language model instance based on the specified model name and source.
-    This function supports models from OpenAI, Azure OpenAI, Anthropic, Ollama, Gemini, Bedrock, and custom model serving.
+    This function supports models from OpenAI, Azure OpenAI, Anthropic, Ollama, Gemini, Bedrock, SecureAPI, and custom model serving.
     Args:
         model (str): The model name to use
         temperature (float): Temperature setting for generation
         stop_sequences (list): Sequences that will stop generation
-        source (str): Source provider: "OpenAI", "AzureOpenAI", "Anthropic", "Ollama", "Gemini", "Bedrock", or "Custom"
+        source (str): Source provider: "OpenAI", "AzureOpenAI", "Anthropic", "Ollama", "Gemini", "Bedrock", "SecureAPI", or "Custom"
                       If None, will attempt to auto-detect from model name
         base_url (str): The base URL for custom model serving (e.g., "http://localhost:8000/v1"), default is None
-        api_key (str): The API key for the custom llm
+        api_key (str): The API key for the custom llm or secure API subscription key
         config (BiomniConfig): Optional configuration object. If provided, unspecified parameters will use config values
+        secure_api_url (str): The URL for the secure API endpoint (for SecureAPI source)
+        secure_model_id (str): The model ID for the secure API (for SecureAPI source)
     """
     # Use config values for any unspecified parameters
     if config is not None:
         if model is None:
-            model = config.llm_model
+            model = config.llm
         if temperature is None:
             temperature = config.temperature
         if source is None:
@@ -44,6 +48,10 @@ def get_llm(
             base_url = config.base_url
         if api_key is None:
             api_key = config.api_key or "EMPTY"
+        if secure_api_url is None:
+            secure_api_url = config.secure_api_url
+        if secure_model_id is None:
+            secure_model_id = config.secure_model_id
 
     # Use defaults if still not specified
     if model is None:
@@ -70,6 +78,8 @@ def get_llm(
                 source = "Gemini"
             elif "groq" in model.lower():
                 source = "Groq"
+            elif secure_api_url is not None:
+                source = "SecureAPI"
             elif base_url is not None:
                 source = "Custom"
             elif "/" in model or any(
@@ -216,7 +226,28 @@ def get_llm(
         )
         return llm
 
+    elif source == "SecureAPI":
+        from biomni.secure_llm import SecureChatModel
+
+        # Validate required parameters
+        if secure_api_url is None:
+            raise ValueError("secure_api_url must be provided for SecureAPI source")
+        if secure_model_id is None:
+            raise ValueError("secure_model_id must be provided for SecureAPI source")
+        if api_key is None or api_key == "EMPTY":
+            # Try to get from environment variable
+            api_key = os.getenv("OPENAI_API_KEY")
+            if not api_key:
+                raise ValueError("api_key (subscription key) must be provided for SecureAPI source")
+
+        return SecureChatModel(
+            model_id=secure_model_id,
+            api_url=secure_api_url,
+            api_key=api_key,
+            temperature=temperature,
+        )
+
     else:
         raise ValueError(
-            f"Invalid source: {source}. Valid options are 'OpenAI', 'AzureOpenAI', 'Anthropic', 'Gemini', 'Groq', 'Bedrock', or 'Ollama'"
+            f"Invalid source: {source}. Valid options are 'OpenAI', 'AzureOpenAI', 'Anthropic', 'Gemini', 'Groq', 'Bedrock', 'SecureAPI', or 'Ollama'"
         )
