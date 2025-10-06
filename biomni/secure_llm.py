@@ -301,13 +301,36 @@ class SecureChatModel(BaseChatModel):
                 "tools": self.bound_tools,
             }
         elif self.model_id.startswith("anthropic.claude") or self.model_id.startswith("arn:aws:bedrock"):
-            # Claude models on Bedrock support tools
+            # Claude models on Bedrock - the secure API doesn't support tool calling format
+            # Convert messages back to prompt_text format
+            prompt_parts = []
+            for msg in messages:
+                role = msg.get("role", "user")
+                content = msg.get("content", "")
+
+                if role == "system":
+                    prompt_parts.append(f"System: {content}")
+                elif role == "user":
+                    prompt_parts.append(f"Human: {content}")
+                elif role == "assistant":
+                    prompt_parts.append(f"Assistant: {content}")
+                elif role == "tool":
+                    prompt_parts.append(f"Tool result: {content}")
+
+            prompt_text = "\n\n".join(prompt_parts)
+
+            # Add tool descriptions to the prompt
+            if self.bound_tools:
+                tool_descriptions = "\n\nAvailable tools:\n"
+                for tool in self.bound_tools:
+                    tool_name = tool.get("function", {}).get("name", "unknown")
+                    tool_desc = tool.get("function", {}).get("description", "")
+                    tool_descriptions += f"- {tool_name}: {tool_desc}\n"
+                prompt_text += tool_descriptions
+
             payload = {
                 "model_id": self.model_id,
-                "messages": messages,
-                "tools": self.bound_tools,
-                "temperature": self.temperature,
-                "max_tokens": self.max_tokens,
+                "prompt_text": prompt_text
             }
         elif self.model_id in ["Llama-3.3-70B-Instruct", "Llama-4-Maverick-17B-128E-Instruct-FP8", "Llama-4-Scout-17B-16E-Instruct"]:
             # Llama models may support tools
