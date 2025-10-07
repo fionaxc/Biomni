@@ -34,7 +34,7 @@ from tqdm import tqdm
 from pathlib import Path
 
 from biomni.config import BiomniConfig
-from biomni.agent.qa_llm import qa_llm
+from biomni.agent.react import react
 
 # ========== SECURE API CONFIGURATIONS ==========
 MODEL_CONFIGS = {
@@ -73,8 +73,9 @@ MODEL_CONFIGS = {
 }
 
 # Default paths
-DEFAULT_PROMPTS_FILE = "/Users/fionacai/Library/CloudStorage/Box-Box/Fiona Cai's Externally Shareable Files/FC-Alsentzer/rare-project/prompts/expert_curated_patient_prompts.jsonl"
+DEFAULT_PROMPTS_FILE = "/share/pi/ema2016/users/fionacai/project/rare-kg/prompts/expert_curated_patient_prompts.jsonl"
 DEFAULT_DATA_PATH = "./data"
+DEFAULT_OUTPUT_DIR = "/share/pi/ema2016/users/fionacai/project/rare-kg/results/Biomni_UDN_expert"
 
 
 def load_prompts(prompts_file: str, start_idx: int = None, end_idx: int = None):
@@ -107,8 +108,14 @@ def create_biomni_agent(model_name: str, api_key: str, data_path: str = DEFAULT_
         temperature=0.0,  # Use temperature 0 for consistent results
     )
 
-    # Create a Q&A agent (no tools needed for this task)
-    agent = qa_llm(path=config.path, llm=config.llm, config=config)
+    # Create a ReAct agent with tools for research
+    agent = react(
+        path=config.path,
+        llm=config.llm,
+        use_tool_retriever=config.use_tool_retriever,
+        timeout_seconds=config.timeout_seconds,
+        config=config
+    )
 
     return agent
 
@@ -151,7 +158,8 @@ def run_prompts(prompts, agent, output_file: str, model_name: str):
     csv_rows = []
 
     # Create output directory structure
-    output_dir = Path(output_file).parent
+    output_path = Path(output_file)
+    output_dir = output_path.parent if output_path.parent != Path('.') else Path.cwd()
     traces_dir = output_dir / "traces"
     traces_dir.mkdir(parents=True, exist_ok=True)
 
@@ -285,14 +293,14 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  # Run all prompts with Claude 3.7
-  python run_udn_biomni.py --model claude37
+  # Run all prompts with GPT-4.1 (default)
+  python run_udn_biomni.py
 
   # Run specific range with GPT-4o
   python run_udn_biomni.py --model gpt4o --start 0 --end 10
 
-  # Run with custom output file
-  python run_udn_biomni.py --output results.jsonl
+  # Run with custom output directory
+  python run_udn_biomni.py --output-dir ./my_results
 
 Available models: """ + ", ".join(MODEL_CONFIGS.keys())
     )
@@ -323,10 +331,10 @@ Available models: """ + ", ".join(MODEL_CONFIGS.keys())
         help="End index (exclusive, default: all)"
     )
     parser.add_argument(
-        "--output",
+        "--output-dir",
         type=str,
-        default=None,
-        help="Output file path (default: results_MODEL_TIMESTAMP.jsonl)"
+        default=DEFAULT_OUTPUT_DIR,
+        help=f"Output directory for all results (default: {DEFAULT_OUTPUT_DIR})"
     )
     parser.add_argument(
         "--data-path",
@@ -345,15 +353,18 @@ Available models: """ + ", ".join(MODEL_CONFIGS.keys())
         print("export OPENAI_API_KEY='your-subscription-key'")
         return 1
 
-    # Create output filename if not specified
-    if args.output is None:
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        args.output = f"results_{args.model}_{timestamp}.jsonl"
+    # Set environment variables EARLY so default_config picks them up for database tools
+    model_config = MODEL_CONFIGS[args.model]
+    os.environ["BIOMNI_SOURCE"] = "SecureAPI"
+    os.environ["BIOMNI_SECURE_API_URL"] = model_config["url"]
+    os.environ["BIOMNI_SECURE_MODEL_ID"] = model_config["model_id"]
 
-    # Create output directory if needed
-    output_dir = os.path.dirname(args.output)
-    if output_dir:
-        os.makedirs(output_dir, exist_ok=True)
+    # Create output directory
+    os.makedirs(args.output_dir, exist_ok=True)
+
+    # Create output filename with timestamp
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    output_file = os.path.join(args.output_dir, f"results_{args.model}_{timestamp}.jsonl")
 
     # Load prompts
     print(f"Loading prompts from: {args.prompts_file}")
@@ -365,7 +376,7 @@ Available models: """ + ", ".join(MODEL_CONFIGS.keys())
     agent = create_biomni_agent(args.model, api_key, args.data_path)
 
     # Run prompts
-    results, errors = run_prompts(prompts, agent, args.output, args.model)
+    results, errors = run_prompts(prompts, agent, output_file, args.model)
 
     return 0 if not errors else 1
 
