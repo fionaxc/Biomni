@@ -94,11 +94,9 @@ def test_direct_api_call():
 
     url = "https://apim.stanfordhealthcare.org/openai-eastus2/deployments/gpt-4.1/chat/completions?api-version=2025-01-01-preview"
 
-    headers = {
-        "Content-Type": "application/json",
-        "api-key": os.environ.get("OPENAI_API_KEY")
-        # Or use whatever header key you normally use (might be "Authorization", "Ocp-Apim-Subscription-Key", etc.)
-    }
+    # Common Headers (Used for all models)
+    headers = {'Ocp-Apim-Subscription-Key': os.environ.get("OPENAI_API_KEY"), 'Content-Type': 'application/json'}
+    
 
     payload = json.dumps({
         "model": "gpt-4.1",
