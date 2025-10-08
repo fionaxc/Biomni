@@ -129,6 +129,7 @@ def get_llm(
             azure_deployment=model,
             openai_api_version=API_VERSION,
             temperature=temperature,
+            default_headers={"Ocp-Apim-Subscription-Key": os.getenv("OPENAI_API_KEY")},
         )
 
     elif source == "Anthropic":
